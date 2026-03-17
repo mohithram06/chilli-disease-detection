@@ -3,7 +3,7 @@ from PIL import Image
 import torch
 from torchvision import transforms, models
 import torch.nn as nn
-
+import gdown
 st.title("🌶️ Chilli Disease Detection")
 
 classes = ["chilli early", "chilli healthy", "chilli mild", "chilli severe"]
@@ -11,6 +11,9 @@ classes = ["chilli early", "chilli healthy", "chilli mild", "chilli severe"]
 # Load model
 model = models.resnet50(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 4)
+url = "https://drive.google.com/uc?id=1JF9vLsBaBM3oOwrFNcwfqWAJTww623yQ"
+gdown.download(url, "model.pth", quiet=False)
+
 model.load_state_dict(torch.load("model.pth", map_location="cpu"))
 model.eval()
 
