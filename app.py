@@ -46,7 +46,7 @@ transform = transforms.Compose([
 ])
 
 # Upload
-uploaded_file = st.file_uploader("📤 Upload Image", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader(" Upload Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     img = Image.open(uploaded_file).convert("RGB")
@@ -60,7 +60,7 @@ if uploaded_file:
         predicted = torch.argmax(probs).item()
 
     # Prediction
-    st.markdown("## 🧠 Prediction Result")
+    st.markdown("## Prediction Result")
     st.success(f"**Disease Stage:** {classes[predicted]}")
 
     # Confidence
@@ -72,6 +72,28 @@ if uploaded_file:
     st.warning(treatments[classes[predicted]])
 
     # All probabilities
-    st.markdown("## 📊 All Class Probabilities")
-    for i, cls in enumerate(classes):
-        st.write(f"{cls}: {probs[i]*100:.2f}%")
+    st.markdown("## All Class Probabilities")
+    import pandas as pd
+
+prob_dict = {classes[i]: probs[i].item()*100 for i in range(len(classes))}
+df = pd.DataFrame(list(prob_dict.items()), columns=["Class", "Probability"])
+
+import plotly.express as px
+
+fig = px.bar(
+    df,
+    x="Class",
+    y="Probability",
+    color="Class",
+    text="Probability",
+    title="Prediction Confidence (%)",
+)
+
+fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+fig.update_layout(
+    yaxis_title="Confidence (%)",
+    xaxis_title="Disease Class",
+    showlegend=False
+)
+
+st.plotly_chart(fig)
