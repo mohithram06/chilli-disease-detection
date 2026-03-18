@@ -3,4 +3,5 @@ torchvision
 streamlit
 Pillow
 gdown
+pandas
 plotly
