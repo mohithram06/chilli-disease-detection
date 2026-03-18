@@ -30,7 +30,7 @@ def load_model():
     model.fc = nn.Linear(model.fc.in_features, 4)
 
     # Download model
-    url = "https://drive.google.com/uc?id=YOUR_ID"
+    url = "https://drive.google.com/uc?id=1JF9vLsBaBM3oOwrFNcwfqWAJTww623yQ"
     gdown.download(url, "model.pth", quiet=False)
 
     model.load_state_dict(torch.load("model.pth", map_location="cpu"))
