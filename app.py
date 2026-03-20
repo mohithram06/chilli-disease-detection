@@ -13,32 +13,36 @@ st.set_page_config(page_title="Chilli Disease Detection", layout="centered")
 
 # Title
 st.markdown("<h1 style='text-align: center; color: green;'>🌶️ Chilli Leaf Disease Detection</h1>", unsafe_allow_html=True)
-st.write("Upload a leaf image to detect disease severity and get complete treatment guidance.")
+st.write("Upload a leaf image to detect disease and get exact treatment guidance.")
 
 # Classes
 classes = ["Early", "Healthy", "Mild", "Severe"]
 
-# Disease info
+# Disease info with DOSE
 disease_info = {
     "Early": {
         "type": "Fungal Infection",
         "reason": "Initial fungal growth due to moisture",
-        "treatment": "Spray Mancozeb 2g/L every 5 days",
+        "treatment": "Mancozeb",
+        "dose": 2  # g per liter
     },
     "Healthy": {
         "type": "No Disease",
         "reason": "Healthy plant",
-        "treatment": "Maintain regular watering and nutrition",
+        "treatment": "No spray needed",
+        "dose": 0
     },
     "Mild": {
         "type": "Bacterial/Fungal",
         "reason": "Spreading infection",
-        "treatment": "Spray Copper Oxychloride 3g/L every 4 days",
+        "treatment": "Copper Oxychloride",
+        "dose": 3
     },
     "Severe": {
         "type": "Severe Fungal/Viral",
         "reason": "Heavy infection spread",
-        "treatment": "Use Carbendazim 2g/L + remove infected leaves",
+        "treatment": "Carbendazim",
+        "dose": 2
     },
 }
 
@@ -67,7 +71,7 @@ transform = transforms.Compose([
 # Upload
 uploaded_file = st.file_uploader("📤 Upload Leaf Image", type=["jpg", "png", "jpeg"])
 
-# 🚀 MAIN LOGIC
+# MAIN APP
 if uploaded_file:
 
     img = Image.open(uploaded_file).convert("RGB")
@@ -80,48 +84,61 @@ if uploaded_file:
         probs = torch.nn.functional.softmax(outputs[0], dim=0)
         predicted = torch.argmax(probs).item()
 
-    # 🔹 User input
-    num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=1)
+    # Input
+    num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=10)
 
-    # 🔹 Prediction
+    # Prediction
     st.markdown("## 🧠 Prediction Result")
     st.success(f"**Disease Stage:** {classes[predicted]}")
 
     confidence = probs[predicted].item() * 100
     st.info(f"Confidence: {confidence:.2f}%")
 
-    # 🔹 Disease Details
+    # Disease details
     info = disease_info[classes[predicted]]
 
     st.markdown("## 🧬 Disease Details")
     st.write(f"**Type:** {info['type']}")
     st.write(f"**Cause:** {info['reason']}")
 
-    # 🔹 Treatment
+    # Treatment
     st.markdown("## 💊 Treatment Plan")
-    st.warning(info["treatment"])
 
-    # 🔹 Spray Calculator
+    if info["dose"] == 0:
+        st.success("No spray needed. Maintain healthy practices.")
+    else:
+        st.warning(f"Use {info['treatment']} ({info['dose']}g per liter)")
+
+    # Spray calculation
     st.markdown("## 🧪 Spray Calculation")
 
-    water_per_plant = 0.5  # liters per plant
+    water_per_plant = 0.5  # liters
     total_water = num_plants * water_per_plant
 
-    st.write(f"💧 Total water needed: **{total_water} liters**")
+    if info["dose"] > 0:
+        total_medicine = total_water * info["dose"]
 
-    st.write("📌 Example:")
-    st.write(f"For {num_plants} plants → Use {total_water}L water + medicine as per dosage")
+        st.write(f"💧 Total water needed: **{total_water:.2f} liters**")
+        st.write(f"💊 Medicine required: **{total_medicine:.2f} grams**")
 
-    st.write("🗓️ Apply every 4–5 days depending on severity")
+        # Convert to kg if large
+        if total_medicine > 1000:
+            st.success(
+                f"👉 Mix **{total_medicine/1000:.2f} kg {info['treatment']}** in **{total_water:.0f}L water**"
+            )
+        else:
+            st.success(
+                f"👉 Mix **{total_medicine:.0f} g {info['treatment']}** in **{total_water:.0f}L water**"
+            )
 
-    # 🔹 Protection Tips
+    # Tips
     st.markdown("## ☔ Protection Tips")
     st.write("• Avoid watering on leaves")
     st.write("• Protect from heavy rain")
     st.write("• Remove infected leaves early")
     st.write("• Ensure good sunlight")
 
-    # 🔹 Graph
+    # Graph
     st.markdown("## 📊 Prediction Confidence")
 
     prob_dict = {classes[i]: probs[i].item()*100 for i in range(len(classes))}
