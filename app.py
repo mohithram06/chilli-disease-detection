@@ -16,12 +16,14 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RL
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 
+# ---------------- SETTINGS ----------------
+st.set_page_config(page_title="Smart Farmer AI", layout="centered")
+
 # ---------------- LANGUAGE ----------------
 language = st.selectbox("🌐 Select Language", ["English", "Hindi", "Kannada"])
-
 lang_map = {"English": "en-IN", "Hindi": "hi-IN", "Kannada": "kn-IN"}
 
-# ---------------- VOICE SPEAK ----------------
+# ---------------- VOICE OUTPUT ----------------
 def speak(text, lang):
     st.markdown(f"""
     <script>
@@ -31,36 +33,58 @@ def speak(text, lang):
     </script>
     """, unsafe_allow_html=True)
 
-# ---------------- VOICE INPUT ----------------
-def voice_ai_input(language):
+# ---------------- REAL-TIME VOICE ----------------
+def real_time_voice(language):
     lang_code = lang_map[language]
+
     return components.html(f"""
-    <button onclick="startRecognition()">🎤 Speak</button>
-    <p id="out"></p>
+    <button onclick="startListening()">🎤 Start Speaking</button>
+    <button onclick="stopListening()">🛑 Stop</button>
+    <p><b>Live Speech:</b></p>
+    <div id="liveText" style="color:green;"></div>
+
     <script>
-    function startRecognition() {{
-        var rec = new webkitSpeechRecognition();
-        rec.lang = "{lang_code}";
-        rec.start();
-        rec.onresult = function(e) {{
-            var text = e.results[0][0].transcript;
-            window.parent.postMessage({{type:'streamlit:setComponentValue', value:text}}, '*');
+    var recognition;
+
+    function startListening() {{
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "{lang_code}";
+
+        recognition.onresult = function(event) {{
+            let finalText = "";
+            for (let i = event.resultIndex; i < event.results.length; ++i) {{
+                finalText += event.results[i][0].transcript;
+            }}
+            document.getElementById("liveText").innerHTML = finalText;
+
+            window.parent.postMessage({{
+                type: "streamlit:setComponentValue",
+                value: finalText
+            }}, "*");
         }};
+
+        recognition.start();
+    }}
+
+    function stopListening() {{
+        if (recognition) recognition.stop();
     }}
     </script>
-    """, height=100)
+    """, height=200)
 
-# ---------------- NLP EXTRACT ----------------
+# ---------------- NLP ----------------
 def extract_details(text):
-    name, field, plants = "", 1, 10
-    text = text.lower()
+    if not isinstance(text, str):
+        return "", 1.0, 10
 
-    if "name" in text:
-        words = text.split()
-        if "name" in words:
-            idx = words.index("name")
-            if idx+1 < len(words):
-                name = words[idx+1]
+    text = text.lower()
+    name, field, plants = "", 1.0, 10
+
+    name_match = re.search(r"name\s*(is)?\s*(\w+)", text)
+    if name_match:
+        name = name_match.group(2)
 
     field_match = re.search(r"(\d+)\s*(acre|acres)", text)
     if field_match:
@@ -119,17 +143,18 @@ transform = transforms.Compose([
 # ---------------- UI ----------------
 st.title("🌶️ Smart Farmer Assistant")
 
-# Voice AI Input
-st.markdown("## 🎤 Speak Details")
-voice_text = voice_ai_input(language)
+st.warning("🎤 Voice works best in Chrome browser")
+
+# Voice
+voice_text = real_time_voice(language)
 
 farmer_name, field_size, num_plants = "", 1.0, 10
 
-if voice_text:
+if isinstance(voice_text, str) and voice_text.strip():
     st.success(f"You said: {voice_text}")
     farmer_name, field_size, num_plants = extract_details(voice_text)
 
-# Manual override
+# Manual fallback
 farmer_name = st.text_input("👨‍🌾 Farmer Name", value=farmer_name)
 field_size = st.number_input("🌾 Field Size (acre)", value=field_size)
 num_plants = st.number_input("🌱 Plants", value=num_plants)
@@ -158,33 +183,39 @@ if image_file:
 
     st.success(f"Disease: {disease}")
 
-    # Spray calc
+    # Spray calculation
     water = field_size * 200
     medicine = water * info["dose"]
 
-    st.write(f"Water: {water} L")
+    st.write(f"💧 Water: {water:.2f} L")
 
     if medicine > 1000:
-        st.write(f"Medicine: {medicine/1000:.2f} kg")
+        st.write(f"💊 Medicine: {medicine/1000:.2f} kg")
     else:
-        st.write(f"Medicine: {medicine:.2f} g")
+        st.write(f"💊 Medicine: {medicine:.2f} g")
 
-    # Voice result
+    # Voice answer
     if st.button("🔊 Speak Result"):
         speak(f"Disease is {disease}. Use {info['treatment']}", lang_map[language])
 
     # AI Chat
     st.markdown("## 🤖 Ask AI")
 
-    q = st.text_input("Ask question")
+    user_q = st.text_input("Ask your question")
 
-    if q:
-        ans = farmer_ai_response(q, disease, info)
+    if user_q:
+        ans = farmer_ai_response(user_q, disease, info)
         st.info(ans)
 
+    # Voice auto response
+    if isinstance(voice_text, str) and voice_text.strip():
+        response = farmer_ai_response(voice_text, disease, info)
+        st.info(f"🤖 {response}")
+        speak(response, lang_map[language])
+
     # Graph
-    df = pd.DataFrame({"Class": classes, "Prob":[p.item()*100 for p in probs]})
-    st.plotly_chart(px.bar(df, x="Class", y="Prob"))
+    df = pd.DataFrame({"Class": classes, "Probability":[p.item()*100 for p in probs]})
+    st.plotly_chart(px.bar(df, x="Class", y="Probability", color="Class"))
 
     # WhatsApp
     msg = f"Disease: {disease}, Use {info['treatment']}"
@@ -203,10 +234,19 @@ if image_file:
             Paragraph("Chilli Disease Report", styles["Title"]),
             Spacer(1,10),
             RLImage(img_path, 3*inch,3*inch),
+            Spacer(1,10),
             Paragraph(f"Farmer: {farmer_name}", styles["Normal"]),
             Paragraph(f"Field: {field_size} acre", styles["Normal"]),
+            Paragraph(f"Plants: {num_plants}", styles["Normal"]),
             Paragraph(f"Disease: {disease}", styles["Normal"]),
-            Paragraph(f"Medicine: {info['treatment']}", styles["Normal"]),
+            Paragraph(f"Treatment: {info['treatment']}", styles["Normal"]),
+            Paragraph(f"Water: {water} L", styles["Normal"]),
+            Paragraph(f"Medicine: {medicine} g", styles["Normal"]),
+            Spacer(1,10),
+            Paragraph("Instructions:", styles["Heading2"]),
+            Paragraph("• Spray every 4-5 days", styles["Normal"]),
+            Paragraph("• Avoid rain after spraying", styles["Normal"]),
+            Paragraph("• Remove infected leaves", styles["Normal"]),
         ]
 
         doc.build(content)
