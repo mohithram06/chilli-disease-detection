@@ -7,54 +7,44 @@ import gdown
 import os
 import pandas as pd
 import plotly.express as px
+import urllib.parse
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
-# Page config
-st.set_page_config(page_title="Chilli Disease Detection", layout="centered")
+# ---------- LANGUAGE ----------
+language = st.selectbox("🌐 Select Language", ["English", "Hindi", "Kannada"])
 
-# Title
-st.markdown("<h1 style='text-align: center; color: green;'>🌶️ Chilli Leaf Disease Detection</h1>", unsafe_allow_html=True)
-st.write("Upload a leaf image to detect disease and get exact treatment guidance.")
-
-# Classes
-classes = ["Early", "Healthy", "Mild", "Severe"]
-
-# Disease info with DOSE
-disease_info = {
-    "Early": {
-        "type": "Fungal Infection",
-        "reason": "Initial fungal growth due to moisture",
-        "treatment": "Mancozeb",
-        "dose": 2  # g per liter
-    },
-    "Healthy": {
-        "type": "No Disease",
-        "reason": "Healthy plant",
-        "treatment": "No spray needed",
-        "dose": 0
-    },
-    "Mild": {
-        "type": "Bacterial/Fungal",
-        "reason": "Spreading infection",
-        "treatment": "Copper Oxychloride",
-        "dose": 3
-    },
-    "Severe": {
-        "type": "Severe Fungal/Viral",
-        "reason": "Heavy infection spread",
-        "treatment": "Carbendazim",
-        "dose": 2
-    },
+translations = {
+    "English": {"title": "Chilli Disease Detection"},
+    "Hindi": {"title": "मिर्ची रोग पहचान"},
+    "Kannada": {"title": "ಮೆಣಸಿನಕಾಯಿ ರೋಗ ಗುರುತು"}
 }
 
-# Load model
+text = translations[language]
+
+# ---------- PAGE ----------
+st.set_page_config(page_title="Chilli Disease", layout="centered")
+st.markdown(f"<h1 style='text-align: center; color: green;'>🌶️ {text['title']}</h1>", unsafe_allow_html=True)
+
+# ---------- CLASSES ----------
+classes = ["Early", "Healthy", "Mild", "Severe"]
+
+# ---------- DISEASE INFO ----------
+disease_info = {
+    "Early": {"type": "Fungal", "reason": "Moisture", "treatment": "Mancozeb", "dose": 2},
+    "Healthy": {"type": "None", "reason": "Healthy", "treatment": "None", "dose": 0},
+    "Mild": {"type": "Bacterial", "reason": "Spread", "treatment": "Copper Oxychloride", "dose": 3},
+    "Severe": {"type": "Severe Infection", "reason": "High spread", "treatment": "Carbendazim", "dose": 2},
+}
+
+# ---------- MODEL ----------
 @st.cache_resource
 def load_model():
     model = models.resnet50(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 4)
 
     if not os.path.exists("model.pth"):
-        url = "https://drive.google.com/uc?id=1JF9vLsBaBM3oOwrFNcwfqWAJTww623yQ"
-        gdown.download(url, "model.pth", quiet=False)
+        gdown.download("https://drive.google.com/uc?id=1JF9vLsBaBM3oOwrFNcwfqWAJTww623yQ", "model.pth", quiet=False)
 
     model.load_state_dict(torch.load("model.pth", map_location="cpu"))
     model.eval()
@@ -62,20 +52,22 @@ def load_model():
 
 model = load_model()
 
-# Transform
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((224,224)),
     transforms.ToTensor()
 ])
 
-# Upload
-uploaded_file = st.file_uploader("📤 Upload Leaf Image", type=["jpg", "png", "jpeg"])
+# ---------- IMAGE INPUT ----------
+image_file = st.camera_input("📷 Take Photo")
 
-# MAIN APP
-if uploaded_file:
+if image_file is None:
+    image_file = st.file_uploader("📤 Upload Image", type=["jpg","png","jpeg"])
 
-    img = Image.open(uploaded_file).convert("RGB")
-    st.image(img, caption="Uploaded Image", use_column_width=True)
+# ---------- MAIN ----------
+if image_file:
+
+    img = Image.open(image_file).convert("RGB")
+    st.image(img, use_column_width=True)
 
     img_tensor = transform(img).unsqueeze(0)
 
@@ -84,75 +76,64 @@ if uploaded_file:
         probs = torch.nn.functional.softmax(outputs[0], dim=0)
         predicted = torch.argmax(probs).item()
 
-    # Input
-    num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=10)
+    num_plants = st.number_input("🌱 Number of infected plants", min_value=1, value=10)
 
     # Prediction
-    st.markdown("## 🧠 Prediction Result")
-    st.success(f"**Disease Stage:** {classes[predicted]}")
-
-    confidence = probs[predicted].item() * 100
+    st.success(f"Disease: {classes[predicted]}")
+    confidence = probs[predicted].item()*100
     st.info(f"Confidence: {confidence:.2f}%")
 
-    # Disease details
     info = disease_info[classes[predicted]]
 
-    st.markdown("## 🧬 Disease Details")
-    st.write(f"**Type:** {info['type']}")
-    st.write(f"**Cause:** {info['reason']}")
+    # Spray calc
+    water = num_plants * 0.5
+    medicine = water * info["dose"]
 
-    # Treatment
-    st.markdown("## 💊 Treatment Plan")
+    st.markdown("## 💊 Treatment")
 
     if info["dose"] == 0:
-        st.success("No spray needed. Maintain healthy practices.")
+        st.success("No spray needed")
     else:
-        st.warning(f"Use {info['treatment']} ({info['dose']}g per liter)")
+        st.warning(f"{info['treatment']} ({info['dose']}g per liter)")
 
-    # Spray calculation
-    st.markdown("## 🧪 Spray Calculation")
-
-    water_per_plant = 0.5  # liters
-    total_water = num_plants * water_per_plant
-
-    if info["dose"] > 0:
-        total_medicine = total_water * info["dose"]
-
-        st.write(f"💧 Total water needed: **{total_water:.2f} liters**")
-        st.write(f"💊 Medicine required: **{total_medicine:.2f} grams**")
-
-        # Convert to kg if large
-        if total_medicine > 1000:
-            st.success(
-                f"👉 Mix **{total_medicine/1000:.2f} kg {info['treatment']}** in **{total_water:.0f}L water**"
-            )
+        if medicine > 1000:
+            st.success(f"👉 Mix {medicine/1000:.2f} kg {info['treatment']} in {water:.0f}L water")
         else:
-            st.success(
-                f"👉 Mix **{total_medicine:.0f} g {info['treatment']}** in **{total_water:.0f}L water**"
-            )
-
-    # Tips
-    st.markdown("## ☔ Protection Tips")
-    st.write("• Avoid watering on leaves")
-    st.write("• Protect from heavy rain")
-    st.write("• Remove infected leaves early")
-    st.write("• Ensure good sunlight")
+            st.success(f"👉 Mix {medicine:.0f} g {info['treatment']} in {water:.0f}L water")
 
     # Graph
-    st.markdown("## 📊 Prediction Confidence")
+    df = pd.DataFrame({
+        "Class": classes,
+        "Probability": [p.item()*100 for p in probs]
+    })
 
-    prob_dict = {classes[i]: probs[i].item()*100 for i in range(len(classes))}
-    df = pd.DataFrame(list(prob_dict.items()), columns=["Class", "Probability"])
-
-    fig = px.bar(
-        df,
-        x="Class",
-        y="Probability",
-        color="Class",
-        text="Probability",
-    )
-
+    fig = px.bar(df, x="Class", y="Probability", color="Class", text="Probability")
     fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
-    fig.update_layout(showlegend=False)
-
     st.plotly_chart(fig)
+
+    # WhatsApp
+    report = f"Disease: {classes[predicted]}, Use {info['treatment']}"
+    url = "https://wa.me/?text=" + urllib.parse.quote(report)
+    st.markdown(f"[📲 Share WhatsApp]({url})")
+
+    # PDF
+    def create_pdf(text):
+        path = "/mnt/data/report.pdf"
+        doc = SimpleDocTemplate(path)
+        styles = getSampleStyleSheet()
+        content = [Paragraph(line, styles["Normal"]) for line in text.split("\n")]
+        doc.build(content)
+        return path
+
+    pdf_text = f"""
+    Disease: {classes[predicted]}
+    Type: {info['type']}
+    Treatment: {info['treatment']}
+    Water: {water}L
+    Medicine: {medicine}g
+    """
+
+    pdf_path = create_pdf(pdf_text)
+
+    with open(pdf_path, "rb") as f:
+        st.download_button("📥 Download PDF", f, file_name="report.pdf")
