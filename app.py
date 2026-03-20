@@ -23,6 +23,45 @@ treatments = {
     "Severe": "Use strong fungicide and isolate infected plants immediately."
 }
 
+disease_info = {
+    "Early": {
+        "type": "Fungal Infection",
+        "reason": "Caused by excess moisture and poor air circulation.",
+        "spray": "Mancozeb or Carbendazim",
+        "dose": "2 grams per liter of water",
+        "days": "Spray every 5 days for 2 weeks",
+        "watering": "Avoid overwatering. Keep soil slightly dry.",
+        "rain": "Avoid spraying before rain. Reapply after rain."
+    },
+    "Healthy": {
+        "type": "No Disease",
+        "reason": "Plant is healthy.",
+        "spray": "No spray needed",
+        "dose": "-",
+        "days": "-",
+        "watering": "Normal watering",
+        "rain": "No precautions needed"
+    },
+    "Mild": {
+        "type": "Bacterial Infection",
+        "reason": "Spreads through water splash and infected tools.",
+        "spray": "Copper oxychloride",
+        "dose": "3 grams per liter",
+        "days": "Spray every 4–5 days",
+        "watering": "Avoid leaf wetting",
+        "rain": "Cover plants if possible"
+    },
+    "Severe": {
+        "type": "Viral Infection",
+        "reason": "Spread by insects like aphids/whiteflies.",
+        "spray": "Imidacloprid (insecticide)",
+        "dose": "0.5 ml per liter",
+        "days": "Spray every 3 days for 2 weeks",
+        "watering": "Normal watering but avoid stress",
+        "rain": "Avoid rain exposure after spray"
+    }
+}
+
 # Load model
 @st.cache_resource
 def load_model():
@@ -59,9 +98,36 @@ if uploaded_file:
         probs = torch.nn.functional.softmax(outputs[0], dim=0)
         predicted = torch.argmax(probs).item()
 
+num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=10)
+
     # Prediction
     st.markdown("## 🧠 Prediction Result")
     st.success(f"**Disease Stage:** {classes[predicted]}")
+   
+   info = disease_info[classes[predicted]]
+
+st.markdown("## 🧬 Disease Details")
+
+st.write(f"**Type:** {info['type']}")
+st.write(f"**Cause:** {info['reason']}")
+
+st.markdown("## 💊 Treatment Plan")
+
+st.write(f"**Recommended Spray:** {info['spray']}")
+st.write(f"**Dosage:** {info['dose']}")
+st.write(f"**Duration:** {info['days']}")
+
+# Calculation (simple logic)
+water_needed = num_plants * 0.5  # liters per plant (approx)
+
+st.markdown("## 📊 Spray Calculation")
+st.info(f"For {num_plants} plants, you need approx **{water_needed:.1f} liters** of solution.")
+
+st.markdown("## 💧 Watering Advice")
+st.write(info['watering'])
+
+st.markdown("## 🌧️ Rain Protection")
+st.write(info['rain'])
 
     # Confidence
     confidence = probs[predicted].item() * 100
