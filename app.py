@@ -101,43 +101,20 @@ if uploaded_file:
 num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=10)
 
     # Prediction
-    st.markdown("## 🧠 Prediction Result")
-    st.success(f"**Disease Stage:** {classes[predicted]}")
+st.markdown("## 🧠 Prediction Result")
+st.success(f"**Disease Stage:** {classes[predicted]}")
    
-   info = disease_info[classes[predicted]]
-
-st.markdown("## 🧬 Disease Details")
-
-st.write(f"**Type:** {info['type']}")
-st.write(f"**Cause:** {info['reason']}")
-
-st.markdown("## 💊 Treatment Plan")
-
-st.write(f"**Recommended Spray:** {info['spray']}")
-st.write(f"**Dosage:** {info['dose']}")
-st.write(f"**Duration:** {info['days']}")
-
-# Calculation (simple logic)
-water_needed = num_plants * 0.5  # liters per plant (approx)
-
-st.markdown("## 📊 Spray Calculation")
-st.info(f"For {num_plants} plants, you need approx **{water_needed:.1f} liters** of solution.")
-
-st.markdown("## 💧 Watering Advice")
-st.write(info['watering'])
-
-st.markdown("## 🌧️ Rain Protection")
-st.write(info['rain'])
+   
 
     # Confidence
-    confidence = probs[predicted].item() * 100
-    st.info(f"Confidence: {confidence:.2f}%")
+confidence = probs[predicted].item() * 100
+st.info(f"Confidence: {confidence:.2f}%")
 
     # Treatment
-    st.markdown("## 🌿 Suggested Treatment")
-    st.warning(treatments[classes[predicted]])
+st.markdown("## 🌿 Suggested Treatment")
+st.warning(treatments[classes[predicted]])
 
     # All probabilities
-    st.markdown("## 📊 All Class Probabilities")
-    for i, cls in enumerate(classes):
+st.markdown("## 📊 All Class Probabilities")
+for i, cls in enumerate(classes):
         st.write(f"{cls}: {probs[i]*100:.2f}%")
