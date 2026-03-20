@@ -4,62 +4,42 @@ import torch
 from torchvision import transforms, models
 import torch.nn as nn
 import gdown
+import os
+import pandas as pd
+import plotly.express as px
 
 # Page config
 st.set_page_config(page_title="Chilli Disease Detection", layout="centered")
 
 # Title
 st.markdown("<h1 style='text-align: center; color: green;'>🌶️ Chilli Leaf Disease Detection</h1>", unsafe_allow_html=True)
-st.write("Upload a leaf image to detect disease severity and get suggestions.")
+st.write("Upload a leaf image to detect disease severity and get complete treatment guidance.")
 
 # Classes
 classes = ["Early", "Healthy", "Mild", "Severe"]
 
-# Treatments
-treatments = {
-    "Early": "Use mild fungicide spray and monitor regularly.",
-    "Healthy": "No disease detected. Maintain good farming practices.",
-    "Mild": "Apply recommended fungicide and remove infected leaves.",
-    "Severe": "Use strong fungicide and isolate infected plants immediately."
-}
-
+# Disease info
 disease_info = {
     "Early": {
         "type": "Fungal Infection",
-        "reason": "Caused by excess moisture and poor air circulation.",
-        "spray": "Mancozeb or Carbendazim",
-        "dose": "2 grams per liter of water",
-        "days": "Spray every 5 days for 2 weeks",
-        "watering": "Avoid overwatering. Keep soil slightly dry.",
-        "rain": "Avoid spraying before rain. Reapply after rain."
+        "reason": "Initial fungal growth due to moisture",
+        "treatment": "Spray Mancozeb 2g/L every 5 days",
     },
     "Healthy": {
         "type": "No Disease",
-        "reason": "Plant is healthy.",
-        "spray": "No spray needed",
-        "dose": "-",
-        "days": "-",
-        "watering": "Normal watering",
-        "rain": "No precautions needed"
+        "reason": "Healthy plant",
+        "treatment": "Maintain regular watering and nutrition",
     },
     "Mild": {
-        "type": "Bacterial Infection",
-        "reason": "Spreads through water splash and infected tools.",
-        "spray": "Copper oxychloride",
-        "dose": "3 grams per liter",
-        "days": "Spray every 4–5 days",
-        "watering": "Avoid leaf wetting",
-        "rain": "Cover plants if possible"
+        "type": "Bacterial/Fungal",
+        "reason": "Spreading infection",
+        "treatment": "Spray Copper Oxychloride 3g/L every 4 days",
     },
     "Severe": {
-        "type": "Viral Infection",
-        "reason": "Spread by insects like aphids/whiteflies.",
-        "spray": "Imidacloprid (insecticide)",
-        "dose": "0.5 ml per liter",
-        "days": "Spray every 3 days for 2 weeks",
-        "watering": "Normal watering but avoid stress",
-        "rain": "Avoid rain exposure after spray"
-    }
+        "type": "Severe Fungal/Viral",
+        "reason": "Heavy infection spread",
+        "treatment": "Use Carbendazim 2g/L + remove infected leaves",
+    },
 }
 
 # Load model
@@ -68,9 +48,9 @@ def load_model():
     model = models.resnet50(weights=None)
     model.fc = nn.Linear(model.fc.in_features, 4)
 
-    # Download model
-    url = "https://drive.google.com/uc?id=1JF9vLsBaBM3oOwrFNcwfqWAJTww623yQ"
-    gdown.download(url, "model.pth", quiet=False)
+    if not os.path.exists("model.pth"):
+        url = "https://drive.google.com/uc?id=1JF9vLsBaBM3oOwrFNcwfqWAJTww623yQ"
+        gdown.download(url, "model.pth", quiet=False)
 
     model.load_state_dict(torch.load("model.pth", map_location="cpu"))
     model.eval()
@@ -80,14 +60,16 @@ model = load_model()
 
 # Transform
 transform = transforms.Compose([
-    transforms.Resize((224,224)),
+    transforms.Resize((224, 224)),
     transforms.ToTensor()
 ])
 
 # Upload
-uploaded_file = st.file_uploader("📤 Upload Image", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("📤 Upload Leaf Image", type=["jpg", "png", "jpeg"])
 
+# 🚀 MAIN LOGIC
 if uploaded_file:
+
     img = Image.open(uploaded_file).convert("RGB")
     st.image(img, caption="Uploaded Image", use_column_width=True)
 
@@ -98,23 +80,62 @@ if uploaded_file:
         probs = torch.nn.functional.softmax(outputs[0], dim=0)
         predicted = torch.argmax(probs).item()
 
-num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=10)
+    # 🔹 User input
+    num_plants = st.number_input("🌱 Enter number of infected plants", min_value=1, value=1)
 
-    # Prediction
-st.markdown("## 🧠 Prediction Result")
-st.success(f"**Disease Stage:** {classes[predicted]}")
-   
-   
+    # 🔹 Prediction
+    st.markdown("## 🧠 Prediction Result")
+    st.success(f"**Disease Stage:** {classes[predicted]}")
 
-    # Confidence
-confidence = probs[predicted].item() * 100
-st.info(f"Confidence: {confidence:.2f}%")
+    confidence = probs[predicted].item() * 100
+    st.info(f"Confidence: {confidence:.2f}%")
 
-    # Treatment
-st.markdown("## 🌿 Suggested Treatment")
-st.warning(treatments[classes[predicted]])
+    # 🔹 Disease Details
+    info = disease_info[classes[predicted]]
 
-    # All probabilities
-st.markdown("## 📊 All Class Probabilities")
-for i, cls in enumerate(classes):
-        st.write(f"{cls}: {probs[i]*100:.2f}%")
+    st.markdown("## 🧬 Disease Details")
+    st.write(f"**Type:** {info['type']}")
+    st.write(f"**Cause:** {info['reason']}")
+
+    # 🔹 Treatment
+    st.markdown("## 💊 Treatment Plan")
+    st.warning(info["treatment"])
+
+    # 🔹 Spray Calculator
+    st.markdown("## 🧪 Spray Calculation")
+
+    water_per_plant = 0.5  # liters per plant
+    total_water = num_plants * water_per_plant
+
+    st.write(f"💧 Total water needed: **{total_water} liters**")
+
+    st.write("📌 Example:")
+    st.write(f"For {num_plants} plants → Use {total_water}L water + medicine as per dosage")
+
+    st.write("🗓️ Apply every 4–5 days depending on severity")
+
+    # 🔹 Protection Tips
+    st.markdown("## ☔ Protection Tips")
+    st.write("• Avoid watering on leaves")
+    st.write("• Protect from heavy rain")
+    st.write("• Remove infected leaves early")
+    st.write("• Ensure good sunlight")
+
+    # 🔹 Graph
+    st.markdown("## 📊 Prediction Confidence")
+
+    prob_dict = {classes[i]: probs[i].item()*100 for i in range(len(classes))}
+    df = pd.DataFrame(list(prob_dict.items()), columns=["Class", "Probability"])
+
+    fig = px.bar(
+        df,
+        x="Class",
+        y="Probability",
+        color="Class",
+        text="Probability",
+    )
+
+    fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+    fig.update_layout(showlegend=False)
+
+    st.plotly_chart(fig)
